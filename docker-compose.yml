@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: coupon_marketplace
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: coupon_marketplace
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      RESELLER_API_TOKEN: test-reseller-token-123
+      ADMIN_API_TOKEN: admin-secret-token-456
+    depends_on:
+      - db
+    restart: on-failure
+
+volumes:
+  pgdata:
