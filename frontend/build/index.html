@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coupon Marketplace</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f5;
+      color: #333;
+    }
+    .container { max-width: 960px; margin: 0 auto; padding: 20px; }
+    h1 { text-align: center; margin-bottom: 10px; }
+
+    .mode-toggle {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 30px;
+    }
+    .mode-toggle button {
+      padding: 10px 24px;
+      border: 2px solid #2563eb;
+      background: white;
+      color: #2563eb;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .mode-toggle button.active { background: #2563eb; color: white; }
+
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .card img {
+      width: 100%;
+      max-height: 180px;
+      object-fit: cover;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+    .products-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn-primary { background: #2563eb; color: white; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-danger { background: #dc2626; color: white; }
+    .btn-success { background: #16a34a; color: white; }
+
+    input, textarea, select {
+      width: 100%;
+      padding: 8px;
+      margin: 4px 0 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    label { font-weight: 600; font-size: 13px; }
+
+    .form-section {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .price-tag { font-size: 20px; font-weight: bold; color: #16a34a; }
+    .sold-badge {
+      background: #fee2e2;
+      color: #dc2626;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .alert { padding: 12px; border-radius: 4px; margin-bottom: 16px; }
+    .alert-success { background: #dcfce7; color: #166534; }
+    .alert-error { background: #fee2e2; color: #991b1b; }
+
+    .coupon-reveal {
+      background: #fefce8;
+      border: 2px dashed #ca8a04;
+      padding: 16px;
+      border-radius: 8px;
+      text-align: center;
+      margin-top: 12px;
+    }
+    .coupon-reveal .value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #854d0e;
+      letter-spacing: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const API_BASE = window.location.origin;
+    const ADMIN_TOKEN = 'admin-secret-token-456';
+
+    function adminFetch(path, options = {}) {
+      return fetch(`${API_BASE}/api/admin${path}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${ADMIN_TOKEN}`,
+          ...options.headers,
+        },
+      });
+    }
+
+    // Admin Panel 
+    function AdminPanel() {
+      const [products, setProducts] = useState([]);
+      const [message, setMessage] = useState(null);
+      const [form, setForm] = useState({
+        name: '', description: '', image_url: '',
+        cost_price: '', margin_percentage: '',
+        value_type: 'STRING', value: ''
+      });
+
+      const loadProducts = async () => {
+        try {
+          const res = await adminFetch('/products');
+          const data = await res.json();
+          setProducts(data);
+        } catch (err) {
+          setMessage({ type: 'error', text: 'Failed to load products' });
+        }
+      };
+
+      useEffect(() => { loadProducts(); }, []);
+
+      const handleCreate = async (e) => {
+        e.preventDefault();
+        try {
+          const body = {
+            ...form,
+            cost_price: parseFloat(form.cost_price),
+            margin_percentage: parseFloat(form.margin_percentage),
+          };
+          const res = await adminFetch('/products', {
+            method: 'POST',
+            body: JSON.stringify(body),
+          });
+
+          if (res.ok) {
+            setMessage({ type: 'success', text: 'Coupon created!' });
+            setForm({ name: '', description: '', image_url: '', cost_price: '', margin_percentage: '', value_type: 'STRING', value: '' });
+            loadProducts();
+          } else {
+            const err = await res.json();
+            setMessage({ type: 'error', text: err.message || 'Failed to create' });
+          }
+        } catch (err) {
+          setMessage({ type: 'error', text: 'Network error' });
+        }
+      };
+
+      const handleDelete = async (id) => {
+        if (!confirm('Delete this product?')) return;
+        try {
+          await adminFetch(`/products/${id}`, { method: 'DELETE' });
+          setMessage({ type: 'success', text: 'Product deleted' });
+          loadProducts();
+        } catch (err) {
+          setMessage({ type: 'error', text: 'Failed to delete' });
+        }
+      };
+
+      return (
+        <div>
+          <h2>Admin Panel</h2>
+
+          {message && (
+            <div className={`alert alert-${message.type}`}>
+              {message.text}
+              <span style={{float:'right', cursor:'pointer'}} onClick={() => setMessage(null)}>x</span>
+            </div>
+          )}
+
+          <div className="form-section">
+            <h3 style={{marginBottom: 16}}>Create New Coupon</h3>
+            <form onSubmit={handleCreate}>
+              <label>Name</label>
+              <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} required placeholder="e.g. Amazon $50 Gift Card" />
+
+              <label>Description</label>
+              <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Short description" />
+
+              <label>Image URL</label>
+              <input value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} required placeholder="https://example.com/image.jpg" />
+
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap: 12}}>
+                <div>
+                  <label>Cost Price ($)</label>
+                  <input type="number" step="0.01" min="0" value={form.cost_price} onChange={e => setForm({...form, cost_price: e.target.value})} required />
+                </div>
+                <div>
+                  <label>Margin (%)</label>
+                  <input type="number" step="0.01" min="0" value={form.margin_percentage} onChange={e => setForm({...form, margin_percentage: e.target.value})} required />
+                </div>
+              </div>
+
+              <label>Value Type</label>
+              <select value={form.value_type} onChange={e => setForm({...form, value_type: e.target.value})}>
+                <option value="STRING">String (Code/Hash)</option>
+                <option value="IMAGE">Image (URL)</option>
+              </select>
+
+              <label>Coupon Value</label>
+              <input value={form.value} onChange={e => setForm({...form, value: e.target.value})} required placeholder="e.g. ABCD-1234-EFGH" />
+
+              {form.cost_price && form.margin_percentage && (
+                <p style={{color:'#666', marginBottom: 12}}>
+                  Sell price: <strong>${(parseFloat(form.cost_price) * (1 + parseFloat(form.margin_percentage) / 100)).toFixed(2)}</strong>
+                </p>
+              )}
+
+              <button type="submit" className="btn-primary">Create Coupon</button>
+            </form>
+          </div>
+
+          <h3 style={{marginBottom: 12}}>All Products ({products.length})</h3>
+          <div className="products-grid">
+            {products.map(p => (
+              <div key={p.id} className="card">
+                <img src={p.image_url} alt={p.name} onError={e => e.target.src = 'https://placehold.co/400x200?text=No+Image'} />
+                <h4>{p.name} {p.is_sold && <span className="sold-badge">SOLD</span>}</h4>
+                <p style={{fontSize: 13, color:'#666', margin:'4px 0'}}>{p.description}</p>
+                <p style={{fontSize: 13}}>Cost: ${p.cost_price} | Margin: {p.margin_percentage}%</p>
+                <p className="price-tag">${p.minimum_sell_price}</p>
+                <p style={{fontSize: 12, color:'#888', marginTop: 4}}>Value: {p.value}</p>
+                <div style={{marginTop: 8}}>
+                  <button className="btn-danger" onClick={() => handleDelete(p.id)}>Delete</button>
+                </div>
+              </div>
+            ))}
+            {products.length === 0 && <p style={{color:'#999'}}>No products yet. Create one above!</p>}
+          </div>
+        </div>
+      );
+    }
+
+    // Customer Panel 
+    function CustomerPanel() {
+      const [products, setProducts] = useState([]);
+      const [message, setMessage] = useState(null);
+      const [purchasedCoupon, setPurchasedCoupon] = useState(null);
+
+      const loadProducts = async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/customer/products`);
+          const data = await res.json();
+          setProducts(data);
+        } catch (err) {
+          setMessage({ type: 'error', text: 'Failed to load products' });
+        }
+      };
+
+      useEffect(() => { loadProducts(); }, []);
+
+      const handlePurchase = async (productId) => {
+        if (!confirm('Buy this coupon?')) return;
+        setPurchasedCoupon(null);
+        try {
+          const res = await fetch(`${API_BASE}/api/customer/products/${productId}/purchase`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            setPurchasedCoupon(data);
+            setMessage({ type: 'success', text: 'Purchase successful!' });
+            loadProducts();
+          } else {
+            const err = await res.json();
+            setMessage({ type: 'error', text: err.message || 'Purchase failed' });
+          }
+        } catch (err) {
+          setMessage({ type: 'error', text: 'Network error' });
+        }
+      };
+
+      return (
+        <div>
+          <h2>Available Coupons</h2>
+
+          {message && (
+            <div className={`alert alert-${message.type}`}>
+              {message.text}
+              <span style={{float:'right', cursor:'pointer'}} onClick={() => setMessage(null)}>x</span>
+            </div>
+          )}
+
+          {purchasedCoupon && (
+            <div className="coupon-reveal">
+              <p>Your coupon code:</p>
+              <p className="value">{purchasedCoupon.value}</p>
+              <p style={{fontSize: 13, marginTop: 8, color:'#666'}}>
+                Type: {purchasedCoupon.value_type} | Paid: ${purchasedCoupon.final_price}
+              </p>
+            </div>
+          )}
+
+          <div className="products-grid" style={{marginTop: 16}}>
+            {products.map(p => (
+              <div key={p.id} className="card">
+                <img src={p.image_url} alt={p.name} onError={e => e.target.src = 'https://placehold.co/400x200?text=No+Image'} />
+                <h4>{p.name}</h4>
+                <p style={{fontSize: 13, color:'#666', margin:'4px 0'}}>{p.description}</p>
+                <p className="price-tag">${p.price}</p>
+                <button className="btn-success" style={{marginTop: 8, width:'100%'}} onClick={() => handlePurchase(p.id)}>
+                  Buy Now
+                </button>
+              </div>
+            ))}
+            {products.length === 0 && <p style={{color:'#999'}}>No coupons available right now.</p>}
+          </div>
+        </div>
+      );
+    }
+
+    // Main App 
+    function App() {
+      const [mode, setMode] = useState('customer');
+
+      return (
+        <div className="container">
+          <h1>Coupon Marketplace</h1>
+          <div className="mode-toggle">
+            <button className={mode === 'customer' ? 'active' : ''} onClick={() => setMode('customer')}>
+              Customer
+            </button>
+            <button className={mode === 'admin' ? 'active' : ''} onClick={() => setMode('admin')}>
+              Admin
+            </button>
+          </div>
+
+          {mode === 'admin' ? <AdminPanel /> : <CustomerPanel />}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
